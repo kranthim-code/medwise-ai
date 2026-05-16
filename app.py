@@ -1,21 +1,43 @@
 import streamlit as st
+from predict import predict_risk
 
+st.title("MedWise AI 🩺")
 
-# Page Setup
-st.set_page_config(page_title="MedWise AI", layout="centered")
-st.subheader("Personalized Health Risk Dashboard")
+st.write("Enter your health data:")
 
-st.write("Enter your health information below")
+age = st.slider("Age", 20, 80)
+sex_label = st.selectbox("Sex", ["Female", "Male"])
+sex = 1 if sex_label == "Male" else 0
+cp = st.selectbox("Chest Pain Type", [0, 1, 2, 3])
+trestbps = st.slider("Blood Pressure", 80, 200)
+chol = st.slider("Cholesterol", 100, 400)
+fbs = st.selectbox("Fasting Blood Sugar > 120", [0, 1])
+restecg = st.selectbox("Rest ECG", [0, 1, 2])
+thalach = st.slider("Max Heart Rate", 60, 200)
+exang = st.selectbox("Exercise Angina", [0, 1])
+oldpeak = st.slider("Oldpeak", 0.0, 5.0)
+slope = st.selectbox("Slope", [0, 1, 2])
+ca = st.selectbox("CA", [0, 1, 2, 3])
+thal = st.selectbox("Thal", [0, 1, 2, 3])
 
-# User Inputs
-age = st.slider("Age", 0, 120, 30)
+if st.button("Predict"):
+    user_data = {
+        "age": age,
+        "sex": sex,
+        "cp": cp,
+        "trestbps": trestbps,
+        "chol": chol,
+        "fbs": fbs,
+        "restecg": restecg,
+        "thalach": thalach,
+        "exang": exang,
+        "oldpeak": oldpeak,
+        "slope": slope,
+        "ca": ca,
+        "thal": thal
+    }
 
-cholesterol = st.slider("Cholesterol Level (mg/dL)", 100, 400, 200)
-blood_pressure = st.slider("Blood Pressure (mm Hg)", 80, 200, 120)
-max_heart_rate = st.slider("Max Heart Rate (bpm)", 60, 220, 150)
-excersize = st.selectbox("Exersize Level?", ["Low", "Medium", "High"])
+    result = predict_risk(user_data)
 
-# Prediction
-if st.button("Predict Risk"):
-    st.success
-    
+    st.write(f"Risk: {result['risk']}")
+    st.write(f"Probability: {result['probability']}%")
