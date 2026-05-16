@@ -47,8 +47,9 @@ if st.button("Predict"):
     result = predict_risk(user_data)
 
     if result["risk"] == "High Risk":
-        st.error(f"Risk: {result['risk']}")
+        st.error(f"⚠️ Risk: {result['risk']}")
     else:
-        st.success(f"Risk: {result['risk']}")
+        st.success(f"✅ Risk: {result['risk']}")
 
-    st.write(f"Probability: {result['probability']}%")
+    st.metric("Probability", f"{result['probability']}%")
+    st.caption("This is not medical advice. Please consult a doctor.")
