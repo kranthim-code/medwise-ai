@@ -31,12 +31,34 @@ thal = st.selectbox("Thal", [0, 1, 2, 3])
 
 st.subheader("Upload Health Data")
 
-uploaded_file = st.file_uploader("Upload a lab report or health CSV", type=["csv", "txt", "pdf"])
+uploaded_file = st.file_uploader(
+    "Upload a lab report or health CSV",
+    type=["csv", "txt", "pdf"]
+)
 
 if uploaded_file is not None:
     st.success("File uploaded successfully!")
-    st.write("Future AI agent will analyze this file and give personalized insights.")
-    
+
+    if uploaded_file.name.endswith(".csv"):
+        lab_df = pd.read_csv(uploaded_file)
+
+        st.write("Lab Data Preview:")
+        st.dataframe(lab_df)
+
+        st.subheader("AI Lab Insights")
+        st.write("This section will identify abnormal values and explain possible risks.")
+
+        if "cholesterol" in lab_df.columns:
+            avg_chol = lab_df["cholesterol"].mean()
+
+            if avg_chol > 240:
+                st.warning("Cholesterol appears high.")
+            else:
+                st.success("Cholesterol looks normal.")
+
+    else:
+        st.write("File uploaded. CSV analysis is supported right now.")
+
 if st.button("Predict"):
     user_data = {
         "age": age,
@@ -90,4 +112,3 @@ if st.button("Predict"):
     df_history.to_csv("prediction_history.csv", mode="a", header=False, index=False)
 
     st.success("Prediction saved to history!")
-    
