@@ -29,6 +29,14 @@ slope = st.selectbox("Slope", [0, 1, 2])
 ca = st.selectbox("CA", [0, 1, 2, 3])
 thal = st.selectbox("Thal", [0, 1, 2, 3])
 
+st.subheader("Upload Health Data")
+
+uploaded_file = st.file_uploader("Upload a lab report or health CSV", type=["csv", "txt", "pdf"])
+
+if uploaded_file is not None:
+    st.success("File uploaded successfully!")
+    st.write("Future AI agent will analyze this file and give personalized insights.")
+    
 if st.button("Predict"):
     user_data = {
         "age": age,
