@@ -1,4 +1,6 @@
 import streamlit as st
+import pandas as pd
+from datetime import datetime
 from predict import predict_risk
 
 st.title("MedWise AI 🩺")
@@ -53,3 +55,31 @@ if st.button("Predict"):
 
     st.metric("Probability", f"{result['probability']}%")
     st.caption("This is not medical advice. Please consult a doctor.")
+
+    st.subheader("Personalized Recommendations")
+
+    if chol > 240:
+        st.write("- Cholesterol is high")
+    if trestbps > 130:
+        st.write("- Blood pressure is elevated")
+    if age > 50:
+        st.write("- Age may increase risk")
+
+    st.write("Suggested next steps:")
+    st.write("- Talk to a doctor")
+    st.write("- Track blood pressure weekly")
+    st.write("- Improve diet/exercise habits")
+
+    history = {
+        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "age": age,
+        "sex": sex_label,
+        "risk": result["risk"],
+        "probability": result["probability"]
+    }
+
+    df_history = pd.DataFrame([history])
+    df_history.to_csv("prediction_history.csv", mode="a", header=False, index=False)
+
+    st.success("Prediction saved to history!")
+    
