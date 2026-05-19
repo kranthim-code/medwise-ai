@@ -229,41 +229,43 @@ with tab_predict:
         fig.tight_layout()
         st.pyplot(fig)
 
-        # ── AI Personalized Recommendations ───────────────────────────────────
-        st.subheader("🤖 Personalized Recommendations")
 
-        with st.spinner("Generating personalized recommendations..."):
-            top_factors = ", ".join(
-                f"{d['feature']} ({d['direction']})"
-                for d in shap_result[:5]
-            )
-            wearable_context = (
-                f"Resting HR: {resting_hr} bpm, "
-                f"Sleep: {sleep_hrs} hrs/night, "
-                f"Daily steps: {daily_steps}"
-            )
 
-            ai_client = OpenAI()
-            ai_response = ai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{
-                    "role": "user",
-                    "content": (
-                        "You are a compassionate health assistant. Based on this patient's data, "
-                        "write 5-7 specific, actionable, personalized health recommendations. "
-                        "Be warm, clear, and encouraging. Do NOT diagnose. "
-                        "End with a reminder to consult their doctor.\n\n"
-                        f"Risk Level: {result['risk']} ({result['probability']}% probability)\n"
-                        f"Age: {age}, Sex: {sex_label}\n"
-                        f"Cholesterol: {chol} mg/dL, Blood Pressure: {trestbps} mmHg\n"
-                        f"Top risk factors from AI model: {top_factors}\n"
-                        f"Wearable data: {wearable_context}\n"
-                    )
-                }]
-            )
-            ai_recommendations = ai_response.choices[0].message.content
+        # ── Personalized Recommendations (rule-based) ─────────────────────────
+        st.subheader("📋 Personalized Recommendations")
 
-        st.write(ai_recommendations)
+        recs = []
+        if chol > 240:
+            recs.append("🔴 Your cholesterol is high — reduce saturated fats, increase fiber, and ask your doctor about medication options.")
+        elif chol > 200:
+            recs.append("🟡 Your cholesterol is borderline — consider dietary changes like cutting fried foods and increasing vegetables.")
+        if trestbps > 140:
+            recs.append("🔴 Your blood pressure is high — reduce sodium intake, limit alcohol, and monitor it weekly.")
+        elif trestbps > 120:
+            recs.append("🟡 Your blood pressure is elevated — try reducing stress and cutting back on salty foods.")
+        if resting_hr > 100:
+            recs.append("🔴 Your resting heart rate is high — limit caffeine, manage stress, and discuss with your doctor.")
+        if sleep_hrs < 6:
+            recs.append("🟡 You're getting less than 6 hours of sleep — aim for 7–9 hours as poor sleep increases heart risk.")
+        if daily_steps < 5000:
+            recs.append("🟡 Your daily activity is low — try to reach 8,000–10,000 steps per day with short walks.")
+        if age > 50:
+            recs.append("🟡 Age is a risk factor — schedule regular cardiac check-ups at least once a year.")
+        if result["risk"] == "High Risk":
+            recs.append("🔴 Your overall risk is high — please consult a cardiologist soon.")
+
+        # Always add top SHAP factor insight
+        top = shap_result[0]
+        recs.append(f"🔵 The biggest factor in your score is **{top['feature']}** — speak to your doctor about this specifically.")
+
+        if not recs:
+            recs.append("✅ Your metrics look good overall — keep up the healthy habits and get regular check-ups.")
+
+        recs.append("👨‍⚕️ This is not medical advice. Always consult a qualified healthcare professional before making any health decisions.")
+
+        ai_recommendations = "\n".join(recs)
+        for rec in recs:
+            st.write(rec)
 
         # ── Doctor Handoff PDF ─────────────────────────────────────────────────
         st.subheader("📄 Doctor Handoff Report")
