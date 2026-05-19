@@ -88,3 +88,7 @@ medwise-ai/
 - This app is for informational purposes only and does not constitute medical advice
 - Always consult a qualified healthcare professional before making health decisions
 - An OpenAI API key is optional — recommendations work without one
+
+## Contributors
+- [Kranthi Muthavarapu](https://github.com/kranthim-code)
+- [Akash Inumella](https://github.com/akashinumella)
