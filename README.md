@@ -4,7 +4,9 @@ An AI-powered heart disease risk prediction app built with Python and Streamlit.
 
 ## Screenshots
 
-
+![Input Form](screenshots/screenshot1.png)
+![Prediction + SHAP Chart](screenshots/screenshot2.png)
+![Doctor Report PDF](screenshots/screenshot3.png)
 
 ---
 
