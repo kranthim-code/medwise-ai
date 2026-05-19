@@ -6,6 +6,7 @@ from datetime import datetime
 from predict import predict_risk, explain_risk
 from pypdf import PdfReader
 from openai import OpenAI
+from lab_parser import extract_lab_values, summarize_for_ai
 
 st.set_page_config(page_title="MedWise AI", page_icon="🩺", layout="wide")
 st.title("MedWise AI 🩺")
@@ -122,24 +123,52 @@ with tab_predict:
             reader   = PdfReader(uploaded_file)
             pdf_text = "".join(page.extract_text() or "" for page in reader.pages)
 
-            st.subheader("Extracted PDF Text")
-            st.text_area("PDF Text", pdf_text, height=200)
+            # ── Structured lab value extraction ───────────────────────────────
+            st.subheader("📊 Extracted Lab Values")
+            lab_results = extract_lab_values(pdf_text)
 
-            if st.button("Analyze PDF with AI"):
+            if lab_results:
+                lab_df = pd.DataFrame(lab_results)
+
+                def color_status(val):
+                    if "🔴" in str(val): return "background-color: #fde8e8"
+                    if "🟡" in str(val): return "background-color: #fff8e1"
+                    if "✅" in str(val): return "background-color: #e8fde8"
+                    return ""
+
+                st.dataframe(
+                    lab_df.style.applymap(color_status, subset=["Status"]),
+                    use_container_width=True
+                )
+
+                abnormal = [r for r in lab_results if "Normal" not in r["Status"]]
+                if abnormal:
+                    st.warning(f"⚠️ {len(abnormal)} abnormal value(s) detected — see highlighted rows above")
+                else:
+                    st.success("✅ All detected lab values are within normal range")
+            else:
+                st.info("No standard lab values detected. Showing raw text below.")
+                st.text_area("PDF Text", pdf_text, height=200)
+
+            # ── AI analysis using structured data ─────────────────────────────
+            if st.button("🤖 Analyze with AI"):
                 client = OpenAI()
+                structured_summary = summarize_for_ai(lab_results)
+
                 response = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[{
                         "role": "user",
                         "content": (
-                            "Analyze this lab report in simple language. "
-                            "Identify abnormal values, possible health risks, and suggested next steps. "
-                            "Do not diagnose. Tell the user to consult a doctor.\n\n"
-                            f"Lab report:\n{pdf_text[:3000]}"  # limit to avoid token overflow
+                            "You are a helpful health assistant. Analyze these lab results in simple language. "
+                            "Explain what each abnormal value means, possible health risks, and suggested next steps. "
+                            "Do NOT diagnose. Always tell the user to consult a doctor.\n\n"
+                            f"{structured_summary}\n\n"
+                            f"Additional raw report context:\n{pdf_text[:1500]}"
                         )
                     }]
                 )
-                st.subheader("AI Lab Analysis")
+                st.subheader("🤖 AI Lab Analysis")
                 st.write(response.choices[0].message.content)
 
     # ── Predict button ────────────────────────────────────────────────────────
@@ -289,3 +318,4 @@ with tab_history:
                 os.remove(HISTORY_FILE)
                 st.success("History cleared.")
                 st.rerun()
+                
