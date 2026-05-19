@@ -10,342 +10,383 @@ from lab_parser import extract_lab_values, summarize_for_ai
 from report_generator import build_doctor_report
 
 st.set_page_config(page_title="MedWise AI", page_icon="🩺", layout="wide")
-st.title("MedWise AI 🩺")
 
 HISTORY_FILE = "prediction_history.csv"
 HISTORY_COLS = ["time", "age", "sex", "risk", "probability"]
 
-# ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_predict, tab_history = st.tabs(["🔍 Predict", "📈 My History"])
+# ══════════════════════════════════════════════════════════════════════════════
+# SIDEBAR
+# ══════════════════════════════════════════════════════════════════════════════
+with st.sidebar:
+    st.image("https://img.icons8.com/color/96/heart-with-pulse.png", width=80)
+    st.title("MedWise AI")
+    st.caption("AI-powered heart health insights")
+    st.divider()
 
+    st.markdown("### How It Works")
+    st.markdown("""
+1. Enter your health data
+2. Hit **Predict My Risk**
+3. See your risk score + what's driving it
+4. Download your doctor report
+""")
+    st.divider()
+
+    st.markdown("### Healthy Ranges")
+    st.markdown("""
+| Metric | Healthy Range |
+|--------|--------------|
+| Blood Pressure | < 120 mmHg |
+| Cholesterol | < 200 mg/dL |
+| Resting HR | 60-100 bpm |
+| Sleep | 7-9 hrs/night |
+| Daily Steps | 8,000-10,000 |
+""")
+    st.divider()
+    st.caption("This app is for informational purposes only. Always consult a doctor.")
+    st.caption("Built by Kranthi Muthavarapu & Akash Inumella")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HERO SECTION
+# ══════════════════════════════════════════════════════════════════════════════
+st.markdown("""
+<div style='background: linear-gradient(135deg, #e1f5fe 0%, #e8f5e9 100%);
+     padding: 2rem 2rem 1.5rem 2rem; border-radius: 16px; margin-bottom: 1.5rem;'>
+    <h1 style='margin:0; color:#1a2e3b; font-size:2.2rem;'>MedWise AI</h1>
+    <p style='margin:0.5rem 0 0 0; color:#2c6e8a; font-size:1.1rem;'>
+        Understand your heart health risk in minutes - powered by machine learning
+    </p>
+    <div style='display:flex; gap:2rem; margin-top:1rem;'>
+        <div style='text-align:center;'>
+            <div style='font-size:1.5rem; font-weight:bold; color:#2ecc71;'>303</div>
+            <div style='font-size:0.8rem; color:#666;'>Patients trained on</div>
+        </div>
+        <div style='text-align:center;'>
+            <div style='font-size:1.5rem; font-weight:bold; color:#2ecc71;'>13</div>
+            <div style='font-size:0.8rem; color:#666;'>Health features</div>
+        </div>
+        <div style='text-align:center;'>
+            <div style='font-size:1.5rem; font-weight:bold; color:#2ecc71;'>17</div>
+            <div style='font-size:0.8rem; color:#666;'>Lab tests parsed</div>
+        </div>
+        <div style='text-align:center;'>
+            <div style='font-size:1.5rem; font-weight:bold; color:#2ecc71;'>Free</div>
+            <div style='font-size:0.8rem; color:#666;'>No account needed</div>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# ── Tabs ──────────────────────────────────────────────────────────────────────
+tab_predict, tab_history = st.tabs(["🔍 Predict My Risk", "📈 My History"])
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 1 — PREDICT
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_predict:
 
-    # ── Core health inputs ────────────────────────────────────────────────────
-    st.subheader("Your Health Data")
+    input_col, result_col = st.columns([1, 1], gap="large")
 
-    age       = st.slider("Age", 20, 80, 45)
-    sex_label = st.selectbox("Sex", ["Female", "Male"])
-    sex       = 1 if sex_label == "Male" else 0
-    cp        = st.selectbox("Chest Pain Type",
-                              [0, 1, 2, 3],
-                              format_func=lambda x: {
-                                  0: "0 – Typical Angina",
-                                  1: "1 – Atypical Angina",
-                                  2: "2 – Non-Anginal Pain",
-                                  3: "3 – Asymptomatic"}[x])
-    trestbps  = st.slider("Resting Blood Pressure (mmHg)", 80, 200, 120)
-    chol      = st.slider("Cholesterol (mg/dl)", 100, 400, 200)
-    fbs_label = st.selectbox("Fasting Blood Sugar > 120 mg/dl", ["No", "Yes"])
-    fbs       = 1 if fbs_label == "Yes" else 0
-    restecg   = st.selectbox("Resting ECG",
-                              [0, 1, 2],
-                              format_func=lambda x: {
-                                  0: "0 – Normal",
-                                  1: "1 – ST-T Abnormality",
-                                  2: "2 – Left Ventricular Hypertrophy"}[x])
-    thalach   = st.slider("Max Heart Rate Achieved", 60, 200, 150)
-    exang_label = st.selectbox("Exercise-Induced Angina", ["No", "Yes"])
-    exang     = 1 if exang_label == "Yes" else 0
-    oldpeak   = st.slider("ST Depression (Oldpeak)", 0.0, 5.0, 1.0, step=0.1)
-    slope     = st.selectbox("ST Slope",
-                              [0, 1, 2],
-                              format_func=lambda x: {
-                                  0: "0 – Upsloping",
-                                  1: "1 – Flat",
-                                  2: "2 – Downsloping"}[x])
-    ca        = st.selectbox("Blocked Vessels (CA)",
-                              [0, 1, 2, 3],
-                              format_func=lambda x: f"{x} vessel{'s' if x != 1 else ''}")
-    thal      = st.selectbox("Thalassemia (Thal)",
-                              [0, 1, 2, 3],
-                              format_func=lambda x: {
-                                  0: "0 – Normal",
-                                  1: "1 – Fixed Defect",
-                                  2: "2 – Reversible Defect",
-                                  3: "3 – Unknown"}[x])
+    with input_col:
+        st.markdown("### Your Health Data")
 
-    # ── Manual entry (advanced) ───────────────────────────────────────────────
-    with st.expander("✏️ Prefer to type values manually?"):
-        st.caption("These override the sliders above if changed.")
-        m1, m2 = st.columns(2)
-        with m1:
-            age      = st.number_input("Age", 20, 80, age, key="m_age")
-            trestbps = st.number_input("Blood Pressure", 80, 200, trestbps, key="m_bp")
-            chol     = st.number_input("Cholesterol", 100, 400, chol, key="m_chol")
-            thalach  = st.number_input("Max Heart Rate", 60, 200, thalach, key="m_hr")
-        with m2:
-            oldpeak  = st.number_input("ST Depression", 0.0, 5.0, float(oldpeak), step=0.1, key="m_op")
+        age       = st.slider("Age", 20, 80, 45)
+        sex_label = st.selectbox("Sex", ["Female", "Male"])
+        sex       = 1 if sex_label == "Male" else 0
+        cp        = st.selectbox("Chest Pain Type",
+                                  [0, 1, 2, 3],
+                                  format_func=lambda x: {
+                                      0: "0 - Typical Angina",
+                                      1: "1 - Atypical Angina",
+                                      2: "2 - Non-Anginal Pain",
+                                      3: "3 - Asymptomatic"}[x])
+        trestbps  = st.slider("Resting Blood Pressure (mmHg)", 80, 200, 120)
+        chol      = st.slider("Cholesterol (mg/dl)", 100, 400, 200)
+        fbs_label = st.selectbox("Fasting Blood Sugar > 120 mg/dl", ["No", "Yes"])
+        fbs       = 1 if fbs_label == "Yes" else 0
+        restecg   = st.selectbox("Resting ECG",
+                                  [0, 1, 2],
+                                  format_func=lambda x: {
+                                      0: "0 - Normal",
+                                      1: "1 - ST-T Abnormality",
+                                      2: "2 - Left Ventricular Hypertrophy"}[x])
+        thalach   = st.slider("Max Heart Rate Achieved", 60, 200, 150)
+        exang_label = st.selectbox("Exercise-Induced Angina", ["No", "Yes"])
+        exang     = 1 if exang_label == "Yes" else 0
+        oldpeak   = st.slider("ST Depression (Oldpeak)", 0.0, 5.0, 1.0, step=0.1)
+        slope     = st.selectbox("ST Slope",
+                                  [0, 1, 2],
+                                  format_func=lambda x: {
+                                      0: "0 - Upsloping",
+                                      1: "1 - Flat",
+                                      2: "2 - Downsloping"}[x])
+        ca        = st.selectbox("Blocked Vessels (CA)",
+                                  [0, 1, 2, 3],
+                                  format_func=lambda x: f"{x} vessel{'s' if x != 1 else ''}")
+        thal      = st.selectbox("Thalassemia (Thal)",
+                                  [0, 1, 2, 3],
+                                  format_func=lambda x: {
+                                      0: "0 - Normal",
+                                      1: "1 - Fixed Defect",
+                                      2: "2 - Reversible Defect",
+                                      3: "3 - Unknown"}[x])
 
-    # ── Wearable data (optional) ──────────────────────────────────────────────
-    with st.expander("⌚ Wearable Data (Optional)"):
-        resting_hr  = st.slider("Resting Heart Rate (bpm)", 40, 120, 70)
-        sleep_hrs   = st.slider("Avg Sleep (hours/night)", 3, 12, 7)
-        daily_steps = st.slider("Daily Steps", 0, 20000, 7000, step=100)
+        with st.expander("✏️ Prefer to type values manually?"):
+            st.caption("These override the sliders above if changed.")
+            m1, m2 = st.columns(2)
+            with m1:
+                age      = st.number_input("Age", 20, 80, age, key="m_age")
+                trestbps = st.number_input("Blood Pressure", 80, 200, trestbps, key="m_bp")
+                chol     = st.number_input("Cholesterol", 100, 400, chol, key="m_chol")
+                thalach  = st.number_input("Max Heart Rate", 60, 200, thalach, key="m_hr")
+            with m2:
+                oldpeak  = st.number_input("ST Depression", 0.0, 5.0, float(oldpeak), step=0.1, key="m_op")
 
-        wearable_summary = f"Resting HR: {resting_hr} bpm, Sleep: {sleep_hrs} hrs/night, Daily steps: {daily_steps}"
+        with st.expander("⌚ Wearable Data (Optional)"):
+            resting_hr  = st.slider("Resting Heart Rate (bpm)", 40, 120, 70)
+            sleep_hrs   = st.slider("Avg Sleep (hours/night)", 3, 12, 7)
+            daily_steps = st.slider("Daily Steps", 0, 20000, 7000, step=100)
 
-        # Quick wearable health indicators
-        w_flags = []
-        if resting_hr > 100: w_flags.append("⚠️ Resting HR is elevated (>100 bpm)")
-        if sleep_hrs < 6:    w_flags.append("⚠️ Sleep is below recommended (< 6 hrs)")
-        if daily_steps < 5000: w_flags.append("⚠️ Daily steps are low (< 5,000)")
+            w_flags = []
+            if resting_hr > 100: w_flags.append("Resting HR is elevated (>100 bpm)")
+            if sleep_hrs < 6:    w_flags.append("Sleep is below recommended (< 6 hrs)")
+            if daily_steps < 5000: w_flags.append("Daily steps are low (< 5,000)")
 
-        if w_flags:
-            for f in w_flags:
-                st.warning(f)
-        else:
-            st.success("✅ Wearable metrics look healthy")
-
-    # ── Lab report upload ─────────────────────────────────────────────────────
-    st.subheader("Upload Health Data")
-    uploaded_file = st.file_uploader(
-        "Upload a lab report PDF or health CSV",
-        type=["csv", "txt", "pdf"]
-    )
-
-    if uploaded_file is not None:
-        st.success("File uploaded successfully!")
-
-        if uploaded_file.name.endswith(".csv"):
-            lab_df = pd.read_csv(uploaded_file)
-            st.write("Lab Data Preview:")
-            st.dataframe(lab_df)
-
-            if "cholesterol" in lab_df.columns:
-                avg_chol = lab_df["cholesterol"].mean()
-                if avg_chol > 240:
-                    st.warning(f"⚠️ Average cholesterol is high ({avg_chol:.0f} mg/dl)")
-                else:
-                    st.success(f"✅ Average cholesterol looks normal ({avg_chol:.0f} mg/dl)")
-
-        elif uploaded_file.name.endswith(".pdf"):
-            reader   = PdfReader(uploaded_file)
-            pdf_text = "".join(page.extract_text() or "" for page in reader.pages)
-
-            # ── Structured lab value extraction ───────────────────────────────
-            st.subheader("📊 Extracted Lab Values")
-            lab_results = extract_lab_values(pdf_text)
-
-            if lab_results:
-                lab_df = pd.DataFrame(lab_results)
-                st.session_state["lab_results"] = lab_results
-
-                def color_status(val):
-                    if "🔴" in str(val): return "background-color: #fde8e8"
-                    if "🟡" in str(val): return "background-color: #fff8e1"
-                    if "✅" in str(val): return "background-color: #e8fde8"
-                    return ""
-
-                st.dataframe(
-                    lab_df.style.applymap(color_status, subset=["Status"]),
-                    use_container_width=True
-                )
-
-                abnormal = [r for r in lab_results if "Normal" not in r["Status"]]
-                if abnormal:
-                    st.warning(f"⚠️ {len(abnormal)} abnormal value(s) detected — see highlighted rows above")
-                else:
-                    st.success("✅ All detected lab values are within normal range")
+            if w_flags:
+                for f in w_flags:
+                    st.warning(f"⚠️ {f}")
             else:
-                st.info("No standard lab values detected. Showing raw text below.")
-                st.text_area("PDF Text", pdf_text, height=200)
+                st.success("✅ Wearable metrics look healthy")
 
-            # ── AI analysis using structured data ─────────────────────────────
-            if st.button("🤖 Analyze with AI"):
-                client = OpenAI()
-                structured_summary = summarize_for_ai(lab_results)
+        with st.expander("🧪 Upload Lab Report (Optional)"):
+            uploaded_file = st.file_uploader(
+                "Upload a lab report PDF or health CSV",
+                type=["csv", "txt", "pdf"]
+            )
 
-                response = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[{
-                        "role": "user",
-                        "content": (
-                            "You are a helpful health assistant. Analyze these lab results in simple language. "
-                            "Explain what each abnormal value means, possible health risks, and suggested next steps. "
-                            "Do NOT diagnose. Always tell the user to consult a doctor.\n\n"
-                            f"{structured_summary}\n\n"
-                            f"Additional raw report context:\n{pdf_text[:1500]}"
+            if uploaded_file is not None:
+                st.success("File uploaded successfully!")
+
+                if uploaded_file.name.endswith(".csv"):
+                    lab_df = pd.read_csv(uploaded_file)
+                    st.dataframe(lab_df)
+                    if "cholesterol" in lab_df.columns:
+                        avg_chol = lab_df["cholesterol"].mean()
+                        if avg_chol > 240:
+                            st.warning(f"⚠️ Average cholesterol is high ({avg_chol:.0f} mg/dl)")
+                        else:
+                            st.success(f"✅ Average cholesterol looks normal ({avg_chol:.0f} mg/dl)")
+
+                elif uploaded_file.name.endswith(".pdf"):
+                    reader   = PdfReader(uploaded_file)
+                    pdf_text = "".join(page.extract_text() or "" for page in reader.pages)
+                    lab_results = extract_lab_values(pdf_text)
+
+                    if lab_results:
+                        lab_df = pd.DataFrame(lab_results)
+                        st.session_state["lab_results"] = lab_results
+
+                        def color_status(val):
+                            if "🔴" in str(val): return "background-color: #fde8e8"
+                            if "🟡" in str(val): return "background-color: #fff8e1"
+                            if "✅" in str(val): return "background-color: #e8fde8"
+                            return ""
+
+                        st.dataframe(
+                            lab_df.style.applymap(color_status, subset=["Status"]),
+                            use_container_width=True
                         )
-                    }]
-                )
-                st.subheader("🤖 AI Lab Analysis")
-                st.write(response.choices[0].message.content)
+                        abnormal = [r for r in lab_results if "Normal" not in r["Status"]]
+                        if abnormal:
+                            st.warning(f"⚠️ {len(abnormal)} abnormal value(s) detected")
+                        else:
+                            st.success("✅ All detected lab values are within normal range")
+                    else:
+                        st.info("No standard lab values detected.")
+                        st.text_area("PDF Text", pdf_text, height=150)
 
-    # ── Predict button ────────────────────────────────────────────────────────
-    st.divider()
-    if st.button("🔍 Predict My Risk", use_container_width=True):
+        st.markdown("<br>", unsafe_allow_html=True)
+        predict_clicked = st.button("🔍 Predict My Risk", use_container_width=True, type="primary")
 
-        user_data = {
-            "age": age, "sex": sex, "cp": cp, "trestbps": trestbps,
-            "chol": chol, "fbs": fbs, "restecg": restecg, "thalach": thalach,
-            "exang": exang, "oldpeak": oldpeak, "slope": slope, "ca": ca, "thal": thal
-        }
+    # ── Results column ────────────────────────────────────────────────────────
+    with result_col:
+        st.markdown("### Results")
 
-        result      = predict_risk(user_data)
-        shap_result = explain_risk(user_data)
+        if not predict_clicked:
+            st.markdown("""
+<div style='background:#f8fbff; border:2px dashed #b3d9f2; border-radius:12px;
+     padding:3rem; text-align:center; color:#888; margin-top:2rem;'>
+    <div style='font-size:3rem;'>🩺</div>
+    <p style='margin-top:1rem; font-size:1rem;'>
+        Fill in your health data and click<br><b>Predict My Risk</b> to see your results
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
-        # Risk result
-        if result["risk"] == "High Risk":
-            st.error(f"⚠️ Risk Level: {result['risk']}")
         else:
-            st.success(f"✅ Risk Level: {result['risk']}")
+            user_data = {
+                "age": age, "sex": sex, "cp": cp, "trestbps": trestbps,
+                "chol": chol, "fbs": fbs, "restecg": restecg, "thalach": thalach,
+                "exang": exang, "oldpeak": oldpeak, "slope": slope, "ca": ca, "thal": thal
+            }
 
-        st.metric("Probability of Heart Disease", f"{result['probability']}%")
-        st.caption("This is not medical advice. Please consult a doctor.")
+            result      = predict_risk(user_data)
+            shap_result = explain_risk(user_data)
 
-        # ── SHAP explanation chart ────────────────────────────────────────────
-        st.subheader("Top Contributing Factors")
+            is_high     = result["risk"] == "High Risk"
+            card_bg     = "#fff0f0" if is_high else "#f0fff4"
+            card_border = "#e74c3c" if is_high else "#2ecc71"
+            card_icon   = "⚠️" if is_high else "✅"
+            card_color  = "#c0392b" if is_high else "#27ae60"
 
-        top_shap = shap_result[:7]  # only top 7
-        features = [d["feature"] for d in top_shap]
-        values   = [d["value"]   for d in top_shap]
-        colors   = ["#e74c3c" if v > 0 else "#2ecc71" for v in values]
+            st.markdown(f"""
+<div style='background:{card_bg}; border-left:6px solid {card_border};
+     border-radius:12px; padding:1.5rem 2rem; margin-bottom:1.5rem;'>
+    <div style='font-size:2rem; font-weight:bold; color:{card_color};'>
+        {card_icon} {result['risk']}
+    </div>
+    <div style='font-size:0.9rem; color:#555; margin-top:0.3rem;'>
+        Heart disease probability
+    </div>
+    <div style='font-size:3rem; font-weight:bold; color:{card_color}; margin-top:0.3rem;'>
+        {result['probability']}%
+    </div>
+    <div style='font-size:0.8rem; color:#888; margin-top:0.5rem;'>
+        This is not medical advice. Please consult a doctor.
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
-        fig, ax = plt.subplots(figsize=(6, 3.5))
-        fig.patch.set_facecolor("#f0f8ff")
-        ax.set_facecolor("#f0f8ff")
+            # ── SHAP chart ────────────────────────────────────────────────────
+            st.markdown("#### What influenced your score?")
 
-        y_pos = range(len(features))
+            top_shap = shap_result[:7]
+            features = [d["feature"] for d in top_shap]
+            values   = [d["value"]   for d in top_shap]
+            colors   = ["#e74c3c" if v > 0 else "#2ecc71" for v in values]
 
-        # Horizontal lines from 0 to value (lollipop stems)
-        for i, (val, col) in enumerate(zip(values, colors)):
-            ax.plot([0, val], [i, i], color=col, linewidth=2, alpha=0.8)
-            ax.scatter(val, i, color=col, s=80, zorder=5)
-            # Place label above the dot to avoid overlap with y-axis labels
-            ax.text(val, i + 0.3,
-                    f"{val:+.3f}",
-                    va="bottom",
-                    ha="center",
-                    fontsize=7.5, color="#1a2e3b")
+            fig, ax = plt.subplots(figsize=(6, 3.5))
+            fig.patch.set_facecolor("#f0f8ff")
+            ax.set_facecolor("#f0f8ff")
 
-        ax.axvline(0, color="#aaaaaa", linewidth=0.8, linestyle="--")
-        ax.set_yticks(list(y_pos))
-        ax.set_yticklabels(features, fontsize=9, color="#1a2e3b")
-        ax.set_xlabel("SHAP Value", fontsize=9, color="#1a2e3b")
-        ax.tick_params(axis="x", labelsize=8, colors="#1a2e3b")
-        ax.spines[["top", "right", "left"]].set_visible(False)
-        ax.spines["bottom"].set_color("#cccccc")
-        ax.set_title("What influenced your score?", fontsize=11,
-                     color="#1a2e3b", pad=10, fontweight="bold")
+            for i, (val, col) in enumerate(zip(values, colors)):
+                ax.plot([0, val], [i, i], color=col, linewidth=2, alpha=0.8)
+                ax.scatter(val, i, color=col, s=80, zorder=5)
+                ax.text(val, i + 0.3, f"{val:+.3f}",
+                        va="bottom", ha="center", fontsize=7.5, color="#1a2e3b")
 
-        fig.tight_layout()
-        st.pyplot(fig)
-        plt.close(fig)
+            ax.axvline(0, color="#aaaaaa", linewidth=0.8, linestyle="--")
+            ax.set_yticks(list(range(len(features))))
+            ax.set_yticklabels(features, fontsize=9, color="#1a2e3b")
+            ax.set_xlabel("SHAP Value", fontsize=9, color="#1a2e3b")
+            ax.tick_params(axis="x", labelsize=8, colors="#1a2e3b")
+            ax.spines[["top", "right", "left"]].set_visible(False)
+            ax.spines["bottom"].set_color("#cccccc")
+            fig.tight_layout()
+            st.pyplot(fig)
+            plt.close(fig)
 
+            # ── Recommendations ───────────────────────────────────────────────
+            st.markdown("#### Personalized Recommendations")
 
+            recs = []
+            if chol > 240:
+                recs.append("Your cholesterol is high - reduce saturated fats, increase fiber, and ask your doctor about medication options.")
+            elif chol > 200:
+                recs.append("Your cholesterol is borderline - consider dietary changes like cutting fried foods and increasing vegetables.")
+            if trestbps > 140:
+                recs.append("Your blood pressure is high - reduce sodium intake, limit alcohol, and monitor it weekly.")
+            elif trestbps > 120:
+                recs.append("Your blood pressure is elevated - try reducing stress and cutting back on salty foods.")
+            if resting_hr > 100:
+                recs.append("Your resting heart rate is high - limit caffeine, manage stress, and discuss with your doctor.")
+            if sleep_hrs < 6:
+                recs.append("You're getting less than 6 hours of sleep - aim for 7-9 hours as poor sleep increases heart risk.")
+            if daily_steps < 5000:
+                recs.append("Your daily activity is low - try to reach 8,000-10,000 steps per day with short walks.")
+            if age > 50:
+                recs.append("Age is a risk factor - schedule regular cardiac check-ups at least once a year.")
+            if result["risk"] == "High Risk":
+                recs.append("Your overall risk is high - please consult a cardiologist soon.")
 
-        # ── Personalized Recommendations (rule-based) ─────────────────────────
-        st.subheader("📋 Personalized Recommendations")
+            top = shap_result[0]
+            recs.append(f"The biggest factor in your score is {top['feature']} - speak to your doctor about this specifically.")
 
-        recs = []
-        if chol > 240:
-            recs.append("• Your cholesterol is high — reduce saturated fats, increase fiber, and ask your doctor about medication options.")
-        elif chol > 200:
-            recs.append("• Your cholesterol is borderline — consider dietary changes like cutting fried foods and increasing vegetables.")
-        if trestbps > 140:
-            recs.append("• Your blood pressure is high — reduce sodium intake, limit alcohol, and monitor it weekly.")
-        elif trestbps > 120:
-            recs.append("• Your blood pressure is elevated — try reducing stress and cutting back on salty foods.")
-        if resting_hr > 100:
-            recs.append("• Your resting heart rate is high — limit caffeine, manage stress, and discuss with your doctor.")
-        if sleep_hrs < 6:
-            recs.append("• You're getting less than 6 hours of sleep — aim for 7-9 hours as poor sleep increases heart risk.")
-        if daily_steps < 5000:
-            recs.append("• Your daily activity is low — try to reach 8,000-10,000 steps per day with short walks.")
-        if age > 50:
-            recs.append("• Age is a risk factor — schedule regular cardiac check-ups at least once a year.")
-        if result["risk"] == "High Risk":
-            recs.append("• Your overall risk is high — please consult a cardiologist soon.")
+            if not recs:
+                recs.append("Your metrics look good overall - keep up the healthy habits and get regular check-ups.")
 
-        # Always add top SHAP factor insight
-        top = shap_result[0]
-        recs.append(f"• The biggest factor in your score is {top['feature']} — speak to your doctor about this specifically.")
+            recs.append("This is not medical advice. Always consult a qualified healthcare professional before making any health decisions.")
 
-        if not recs:
-            recs.append("• Your metrics look good overall — keep up the healthy habits and get regular check-ups.")
+            ai_recommendations = "\n".join(f"• {r}" for r in recs)
 
-        recs.append("• This is not medical advice. Always consult a qualified healthcare professional before making any health decisions.")
+            for rec in recs:
+                st.markdown(f"• {rec}")
 
-        ai_recommendations = "\n".join(recs)
-        for rec in recs:
-            st.write(rec)
+            # ── Doctor PDF ────────────────────────────────────────────────────
+            st.markdown("#### Doctor Handoff Report")
+            st.caption("Download and bring this to your next appointment.")
 
-        # ── Doctor Handoff PDF ─────────────────────────────────────────────────
-        st.subheader("📄 Doctor Handoff Report")
-        st.write("Download a PDF summary to share with your doctor.")
+            lab_results_for_report = st.session_state.get("lab_results", None)
+            pdf_bytes = build_doctor_report(
+                patient_data=user_data,
+                risk_result=result,
+                shap_result=shap_result,
+                ai_recommendations=ai_recommendations,
+                lab_results=lab_results_for_report,
+            )
 
-        lab_results_for_report = st.session_state.get("lab_results", None)
+            st.download_button(
+                label="⬇️ Download Doctor Report (PDF)",
+                data=pdf_bytes,
+                file_name=f"medwise_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+            )
 
-        pdf_bytes = build_doctor_report(
-            patient_data=user_data,
-            risk_result=result,
-            shap_result=shap_result,
-            ai_recommendations=ai_recommendations,
-            lab_results=lab_results_for_report,
-        )
+            # ── Save to history ───────────────────────────────────────────────
+            new_row = pd.DataFrame([{
+                "time":        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "age":         age,
+                "sex":         sex_label,
+                "risk":        result["risk"],
+                "probability": result["probability"]
+            }])
 
-        st.download_button(
-            label="⬇️ Download Doctor Report (PDF)",
-            data=pdf_bytes,
-            file_name=f"medwise_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-        )
+            if os.path.exists(HISTORY_FILE):
+                new_row.to_csv(HISTORY_FILE, mode="a", header=False, index=False)
+            else:
+                new_row.to_csv(HISTORY_FILE, mode="w", header=True, index=False)
 
-        # ── Save to history ───────────────────────────────────────────────────
-        new_row = pd.DataFrame([{
-            "time":        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "age":         age,
-            "sex":         sex_label,
-            "risk":        result["risk"],
-            "probability": result["probability"]
-        }])
-
-        if os.path.exists(HISTORY_FILE):
-            new_row.to_csv(HISTORY_FILE, mode="a", header=False, index=False)
-        else:
-            new_row.to_csv(HISTORY_FILE, mode="w", header=True, index=False)
-
-        st.success("✅ Prediction saved to history!")
+            st.success("✅ Prediction saved to history!")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 2 — HISTORY
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_history:
-    st.subheader("Your Prediction History")
+    st.markdown("### Your Prediction History")
 
     if not os.path.exists(HISTORY_FILE):
         st.info("No predictions yet. Run a prediction first!")
     else:
         df_hist = pd.read_csv(HISTORY_FILE, names=HISTORY_COLS, header=None)
-
-        # Drop rows where 'time' literally says 'time' (old headerless files)
         df_hist = df_hist[df_hist["time"] != "time"].reset_index(drop=True)
         df_hist["probability"] = pd.to_numeric(df_hist["probability"], errors="coerce")
         df_hist["time"]        = pd.to_datetime(df_hist["time"], errors="coerce")
 
-        # Summary stats
         s_col1, s_col2, s_col3 = st.columns(3)
         s_col1.metric("Total Predictions", len(df_hist))
         s_col2.metric("Avg Probability", f"{df_hist['probability'].mean():.1f}%")
 
         if len(df_hist) >= 2:
             trend = df_hist["probability"].iloc[-1] - df_hist["probability"].iloc[-2]
-            s_col3.metric("Trend vs Last", f"{trend:+.1f}%",
-                          delta_color="inverse")  # red = going up (bad), green = going down (good)
+            s_col3.metric("Trend vs Last", f"{trend:+.1f}%", delta_color="inverse")
 
-        # Line chart
-        st.subheader("Risk Probability Over Time")
+        st.markdown("#### Risk Probability Over Time")
         chart_data = df_hist.set_index("time")[["probability"]]
         st.line_chart(chart_data)
 
-        # Color-coded table
-        st.subheader("All Predictions")
+        st.markdown("#### All Predictions")
 
         def highlight_risk(row):
             color = "#fde8e8" if row["risk"] == "High Risk" else "#e8fde8"
@@ -357,7 +398,6 @@ with tab_history:
             use_container_width=True
         )
 
-        # Clear history
         st.divider()
         if "confirm_clear" not in st.session_state:
             st.session_state.confirm_clear = False
@@ -378,4 +418,3 @@ with tab_history:
                 if st.button("❌ Cancel", key="confirm_no"):
                     st.session_state.confirm_clear = False
                     st.rerun()
-                    
