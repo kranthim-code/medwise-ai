@@ -14,6 +14,27 @@ st.set_page_config(page_title="MedWise AI", page_icon="🩺", layout="wide")
 HISTORY_FILE = "prediction_history.csv"
 HISTORY_COLS = ["time", "age", "sex", "risk", "probability"]
 
+# Population average risk by age/sex group
+POPULATION_RISK = {
+    ("Female", "20-40"): 15, ("Female", "41-55"): 25, ("Female", "56+"): 38,
+    ("Male",   "20-40"): 28, ("Male",   "41-55"): 42, ("Male",   "56+"): 55,
+}
+
+def get_age_group(age):
+    if age <= 40: return "20-40"
+    if age <= 55: return "41-55"
+    return "56+"
+
+def calc_bmi(weight_kg, height_cm):
+    h = height_cm / 100
+    return round(weight_kg / (h * h), 1)
+
+def bmi_category(bmi):
+    if bmi < 18.5: return "Underweight", "#3498db"
+    if bmi < 25:   return "Normal", "#2ecc71"
+    if bmi < 30:   return "Overweight", "#f39c12"
+    return "Obese", "#e74c3c"
+
 # ══════════════════════════════════════════════════════════════════════════════
 # SIDEBAR
 # ══════════════════════════════════════════════════════════════════════════════
@@ -38,6 +59,7 @@ with st.sidebar:
 |--------|--------------|
 | Blood Pressure | < 120 mmHg |
 | Cholesterol | < 200 mg/dL |
+| BMI | 18.5 - 24.9 |
 | Resting HR | 60-100 bpm |
 | Sleep | 7-9 hrs/night |
 | Daily Steps | 8,000-10,000 |
@@ -50,28 +72,29 @@ with st.sidebar:
 # HERO SECTION
 # ══════════════════════════════════════════════════════════════════════════════
 st.markdown("""
-<div style='background: linear-gradient(135deg, #e1f5fe 0%, #e8f5e9 100%);
-     padding: 2rem 2rem 1.5rem 2rem; border-radius: 16px; margin-bottom: 1.5rem;'>
-    <h1 style='margin:0; color:#1a2e3b; font-size:2.2rem;'>MedWise AI</h1>
-    <p style='margin:0.5rem 0 0 0; color:#2c6e8a; font-size:1.1rem;'>
+<div style='background: linear-gradient(135deg, #1a6e8a 0%, #27ae60 100%);
+     padding: 2.5rem 2rem 2rem 2rem; border-radius: 16px; margin-bottom: 1.5rem;
+     box-shadow: 0 4px 15px rgba(0,0,0,0.1);'>
+    <h1 style='margin:0; color:white; font-size:2.4rem; font-weight:800;'>MedWise AI 🩺</h1>
+    <p style='margin:0.5rem 0 0 0; color:rgba(255,255,255,0.85); font-size:1.1rem;'>
         Understand your heart health risk in minutes - powered by machine learning
     </p>
-    <div style='display:flex; gap:2rem; margin-top:1rem;'>
+    <div style='display:flex; gap:2.5rem; margin-top:1.5rem; flex-wrap:wrap;'>
         <div style='text-align:center;'>
-            <div style='font-size:1.5rem; font-weight:bold; color:#2ecc71;'>303</div>
-            <div style='font-size:0.8rem; color:#666;'>Patients trained on</div>
+            <div style='font-size:1.8rem; font-weight:bold; color:white;'>303</div>
+            <div style='font-size:0.8rem; color:rgba(255,255,255,0.75);'>Patients trained on</div>
         </div>
         <div style='text-align:center;'>
-            <div style='font-size:1.5rem; font-weight:bold; color:#2ecc71;'>13</div>
-            <div style='font-size:0.8rem; color:#666;'>Health features</div>
+            <div style='font-size:1.8rem; font-weight:bold; color:white;'>13</div>
+            <div style='font-size:0.8rem; color:rgba(255,255,255,0.75);'>Health features</div>
         </div>
         <div style='text-align:center;'>
-            <div style='font-size:1.5rem; font-weight:bold; color:#2ecc71;'>17</div>
-            <div style='font-size:0.8rem; color:#666;'>Lab tests parsed</div>
+            <div style='font-size:1.8rem; font-weight:bold; color:white;'>17</div>
+            <div style='font-size:0.8rem; color:rgba(255,255,255,0.75);'>Lab tests parsed</div>
         </div>
         <div style='text-align:center;'>
-            <div style='font-size:1.5rem; font-weight:bold; color:#2ecc71;'>Free</div>
-            <div style='font-size:0.8rem; color:#666;'>No account needed</div>
+            <div style='font-size:1.8rem; font-weight:bold; color:white;'>Free</div>
+            <div style='font-size:0.8rem; color:rgba(255,255,255,0.75);'>No account needed</div>
         </div>
     </div>
 </div>
@@ -88,49 +111,98 @@ with tab_predict:
     input_col, result_col = st.columns([1, 1], gap="large")
 
     with input_col:
-        st.markdown("### Your Health Data")
 
-        age       = st.slider("Age", 20, 80, 45)
-        sex_label = st.selectbox("Sex", ["Female", "Male"])
-        sex       = 1 if sex_label == "Male" else 0
-        cp        = st.selectbox("Chest Pain Type",
-                                  [0, 1, 2, 3],
-                                  format_func=lambda x: {
-                                      0: "0 - Typical Angina",
-                                      1: "1 - Atypical Angina",
-                                      2: "2 - Non-Anginal Pain",
-                                      3: "3 - Asymptomatic"}[x])
-        trestbps  = st.slider("Resting Blood Pressure (mmHg)", 80, 200, 120)
-        chol      = st.slider("Cholesterol (mg/dl)", 100, 400, 200)
-        fbs_label = st.selectbox("Fasting Blood Sugar > 120 mg/dl", ["No", "Yes"])
-        fbs       = 1 if fbs_label == "Yes" else 0
-        restecg   = st.selectbox("Resting ECG",
-                                  [0, 1, 2],
-                                  format_func=lambda x: {
-                                      0: "0 - Normal",
-                                      1: "1 - ST-T Abnormality",
-                                      2: "2 - Left Ventricular Hypertrophy"}[x])
-        thalach   = st.slider("Max Heart Rate Achieved", 60, 200, 150)
-        exang_label = st.selectbox("Exercise-Induced Angina", ["No", "Yes"])
-        exang     = 1 if exang_label == "Yes" else 0
-        oldpeak   = st.slider("ST Depression (Oldpeak)", 0.0, 5.0, 1.0, step=0.1)
-        slope     = st.selectbox("ST Slope",
-                                  [0, 1, 2],
-                                  format_func=lambda x: {
-                                      0: "0 - Upsloping",
-                                      1: "1 - Flat",
-                                      2: "2 - Downsloping"}[x])
-        ca        = st.selectbox("Blocked Vessels (CA)",
-                                  [0, 1, 2, 3],
-                                  format_func=lambda x: f"{x} vessel{'s' if x != 1 else ''}")
-        thal      = st.selectbox("Thalassemia (Thal)",
-                                  [0, 1, 2, 3],
-                                  format_func=lambda x: {
-                                      0: "0 - Normal",
-                                      1: "1 - Fixed Defect",
-                                      2: "2 - Reversible Defect",
-                                      3: "3 - Unknown"}[x])
+        # ── GROUP 1: Basic Info ───────────────────────────────────────────────
+        st.markdown("### 👤 Basic Information")
+        with st.container():
+            age       = st.slider("Age", 20, 80, 45)
+            sex_label = st.selectbox("Sex", ["Female", "Male"])
+            sex       = 1 if sex_label == "Male" else 0
 
+            # BMI Calculator
+            st.markdown("**BMI Calculator**")
+            bmi_col1, bmi_col2 = st.columns(2)
+            with bmi_col1:
+                weight_kg = st.number_input("Weight (kg)", 30, 200, 70)
+            with bmi_col2:
+                height_cm = st.number_input("Height (cm)", 100, 220, 170)
+
+            bmi = calc_bmi(weight_kg, height_cm)
+            bmi_cat, bmi_color = bmi_category(bmi)
+            st.markdown(f"""
+<div style='background:#f8fbff; border-left:4px solid {bmi_color};
+     border-radius:8px; padding:0.6rem 1rem; margin-top:0.3rem;'>
+    <span style='font-weight:bold; color:{bmi_color};'>BMI: {bmi}</span>
+    <span style='color:#666; font-size:0.9rem;'> - {bmi_cat}</span>
+</div>
+""", unsafe_allow_html=True)
+
+        # ── GROUP 2: Heart Metrics ────────────────────────────────────────────
+        st.markdown("### ❤️ Heart Metrics")
+        with st.expander("Expand Heart Metrics", expanded=True):
+            cp = st.selectbox("Chest Pain Type",
+                              [0, 1, 2, 3],
+                              format_func=lambda x: {
+                                  0: "0 - Typical Angina",
+                                  1: "1 - Atypical Angina",
+                                  2: "2 - Non-Anginal Pain",
+                                  3: "3 - Asymptomatic"}[x])
+            trestbps = st.slider("Resting Blood Pressure (mmHg)", 80, 200, 120)
+            thalach  = st.slider("Max Heart Rate Achieved", 60, 200, 150)
+            oldpeak  = st.slider("ST Depression (Oldpeak)", 0.0, 5.0, 1.0, step=0.1)
+            slope    = st.selectbox("ST Slope",
+                                    [0, 1, 2],
+                                    format_func=lambda x: {
+                                        0: "0 - Upsloping",
+                                        1: "1 - Flat",
+                                        2: "2 - Downsloping"}[x])
+            restecg  = st.selectbox("Resting ECG",
+                                    [0, 1, 2],
+                                    format_func=lambda x: {
+                                        0: "0 - Normal",
+                                        1: "1 - ST-T Abnormality",
+                                        2: "2 - Left Ventricular Hypertrophy"}[x])
+            exang_label = st.selectbox("Exercise-Induced Angina", ["No", "Yes"])
+            exang    = 1 if exang_label == "Yes" else 0
+
+        # ── GROUP 3: Blood Work ───────────────────────────────────────────────
+        st.markdown("### 🧪 Blood Work")
+        with st.expander("Expand Blood Work", expanded=True):
+            chol      = st.slider("Cholesterol (mg/dl)", 100, 400, 200)
+            fbs_label = st.selectbox("Fasting Blood Sugar > 120 mg/dl", ["No", "Yes"])
+            fbs       = 1 if fbs_label == "Yes" else 0
+            ca        = st.selectbox("Blocked Vessels (CA)",
+                                     [0, 1, 2, 3],
+                                     format_func=lambda x: f"{x} vessel{'s' if x != 1 else ''}")
+            thal      = st.selectbox("Thalassemia (Thal)",
+                                     [0, 1, 2, 3],
+                                     format_func=lambda x: {
+                                         0: "0 - Normal",
+                                         1: "1 - Fixed Defect",
+                                         2: "2 - Reversible Defect",
+                                         3: "3 - Unknown"}[x])
+
+        # ── GROUP 4: Lifestyle ────────────────────────────────────────────────
+        st.markdown("### 🏃 Lifestyle & Wearables")
+        with st.expander("Expand Lifestyle Data"):
+            resting_hr  = st.slider("Resting Heart Rate (bpm)", 40, 120, 70)
+            sleep_hrs   = st.slider("Avg Sleep (hours/night)", 3, 12, 7)
+            daily_steps = st.slider("Daily Steps", 0, 20000, 7000, step=100)
+
+            w_flags = []
+            if resting_hr > 100: w_flags.append("Resting HR is elevated (>100 bpm)")
+            if sleep_hrs < 6:    w_flags.append("Sleep is below recommended (< 6 hrs)")
+            if daily_steps < 5000: w_flags.append("Daily steps are low (< 5,000)")
+            if bmi >= 30:        w_flags.append(f"BMI of {bmi} is in the obese range")
+            elif bmi >= 25:      w_flags.append(f"BMI of {bmi} is in the overweight range")
+
+            if w_flags:
+                for f in w_flags:
+                    st.warning(f"⚠️ {f}")
+            else:
+                st.success("✅ Lifestyle metrics look healthy")
+
+        # ── GROUP 5: Manual Entry ─────────────────────────────────────────────
         with st.expander("✏️ Prefer to type values manually?"):
             st.caption("These override the sliders above if changed.")
             m1, m2 = st.columns(2)
@@ -142,22 +214,7 @@ with tab_predict:
             with m2:
                 oldpeak  = st.number_input("ST Depression", 0.0, 5.0, float(oldpeak), step=0.1, key="m_op")
 
-        with st.expander("⌚ Wearable Data (Optional)"):
-            resting_hr  = st.slider("Resting Heart Rate (bpm)", 40, 120, 70)
-            sleep_hrs   = st.slider("Avg Sleep (hours/night)", 3, 12, 7)
-            daily_steps = st.slider("Daily Steps", 0, 20000, 7000, step=100)
-
-            w_flags = []
-            if resting_hr > 100: w_flags.append("Resting HR is elevated (>100 bpm)")
-            if sleep_hrs < 6:    w_flags.append("Sleep is below recommended (< 6 hrs)")
-            if daily_steps < 5000: w_flags.append("Daily steps are low (< 5,000)")
-
-            if w_flags:
-                for f in w_flags:
-                    st.warning(f"⚠️ {f}")
-            else:
-                st.success("✅ Wearable metrics look healthy")
-
+        # ── Lab Upload ────────────────────────────────────────────────────────
         with st.expander("🧪 Upload Lab Report (Optional)"):
             uploaded_file = st.file_uploader(
                 "Upload a lab report PDF or health CSV",
@@ -205,6 +262,7 @@ with tab_predict:
                         st.info("No standard lab values detected.")
                         st.text_area("PDF Text", pdf_text, height=150)
 
+        # ── Predict button ────────────────────────────────────────────────────
         st.markdown("<br>", unsafe_allow_html=True)
         predict_clicked = st.button("🔍 Predict My Risk", use_container_width=True, type="primary")
 
@@ -239,25 +297,68 @@ with tab_predict:
             card_icon   = "⚠️" if is_high else "✅"
             card_color  = "#c0392b" if is_high else "#27ae60"
 
+            # ── Risk Card ─────────────────────────────────────────────────────
             st.markdown(f"""
 <div style='background:{card_bg}; border-left:6px solid {card_border};
-     border-radius:12px; padding:1.5rem 2rem; margin-bottom:1.5rem;'>
+     border-radius:12px; padding:1.5rem 2rem; margin-bottom:1rem;
+     box-shadow: 0 2px 8px rgba(0,0,0,0.07);'>
     <div style='font-size:2rem; font-weight:bold; color:{card_color};'>
         {card_icon} {result['risk']}
     </div>
     <div style='font-size:0.9rem; color:#555; margin-top:0.3rem;'>
         Heart disease probability
     </div>
-    <div style='font-size:3rem; font-weight:bold; color:{card_color}; margin-top:0.3rem;'>
+    <div style='font-size:3.5rem; font-weight:bold; color:{card_color}; margin-top:0.3rem; line-height:1;'>
         {result['probability']}%
     </div>
     <div style='font-size:0.8rem; color:#888; margin-top:0.5rem;'>
-        This is not medical advice. Please consult a doctor.
+        Not medical advice. Please consult a doctor.
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-            # ── SHAP chart ────────────────────────────────────────────────────
+            # ── Risk Comparison ───────────────────────────────────────────────
+            age_group  = get_age_group(age)
+            pop_avg    = POPULATION_RISK.get((sex_label, age_group), 35)
+            user_prob  = result["probability"]
+            diff       = round(user_prob - pop_avg, 1)
+            diff_color = "#e74c3c" if diff > 0 else "#27ae60"
+            diff_label = f"+{diff}% higher" if diff > 0 else f"{abs(diff)}% lower"
+
+            st.markdown(f"""
+<div style='background:#f8fbff; border-radius:10px; padding:1rem 1.5rem;
+     margin-bottom:1rem; border:1px solid #e1f0fb;'>
+    <div style='font-size:0.85rem; color:#555; font-weight:600; margin-bottom:0.5rem;'>
+        vs. Average for {sex_label}s aged {age_group}
+    </div>
+    <div style='display:flex; align-items:center; gap:1rem;'>
+        <div style='text-align:center;'>
+            <div style='font-size:1.4rem; font-weight:bold; color:{card_color};'>{user_prob}%</div>
+            <div style='font-size:0.75rem; color:#888;'>Your risk</div>
+        </div>
+        <div style='font-size:1.5rem; color:#ccc;'>vs</div>
+        <div style='text-align:center;'>
+            <div style='font-size:1.4rem; font-weight:bold; color:#666;'>{pop_avg}%</div>
+            <div style='font-size:0.75rem; color:#888;'>Population avg</div>
+        </div>
+        <div style='margin-left:auto; font-size:1rem; font-weight:bold; color:{diff_color};'>
+            {diff_label} than average
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+            # ── BMI Summary in results ────────────────────────────────────────
+            st.markdown(f"""
+<div style='background:#f8fbff; border-left:4px solid {bmi_color};
+     border-radius:8px; padding:0.6rem 1rem; margin-bottom:1rem;'>
+    <span style='font-weight:bold; color:{bmi_color};'>BMI: {bmi}</span>
+    <span style='color:#666; font-size:0.9rem;'> - {bmi_cat}</span>
+    {"<span style='color:#e74c3c; font-size:0.85rem;'> - May increase heart risk</span>" if bmi >= 25 else "<span style='color:#27ae60; font-size:0.85rem;'> - Healthy weight</span>"}
+</div>
+""", unsafe_allow_html=True)
+
+            # ── SHAP Chart ────────────────────────────────────────────────────
             st.markdown("#### What influenced your score?")
 
             top_shap = shap_result[:7]
@@ -298,6 +399,10 @@ with tab_predict:
                 recs.append("Your blood pressure is high - reduce sodium intake, limit alcohol, and monitor it weekly.")
             elif trestbps > 120:
                 recs.append("Your blood pressure is elevated - try reducing stress and cutting back on salty foods.")
+            if bmi >= 30:
+                recs.append(f"Your BMI of {bmi} is in the obese range - weight loss can significantly reduce heart disease risk.")
+            elif bmi >= 25:
+                recs.append(f"Your BMI of {bmi} is overweight - even a 5-10% weight reduction improves heart health.")
             if resting_hr > 100:
                 recs.append("Your resting heart rate is high - limit caffeine, manage stress, and discuss with your doctor.")
             if sleep_hrs < 6:
@@ -319,8 +424,12 @@ with tab_predict:
 
             ai_recommendations = "\n".join(f"• {r}" for r in recs)
 
+            st.markdown("""
+<div style='background:#f8fbff; border-radius:10px; padding:1rem 1.5rem; border:1px solid #e1f0fb;'>
+""", unsafe_allow_html=True)
             for rec in recs:
                 st.markdown(f"• {rec}")
+            st.markdown("</div>", unsafe_allow_html=True)
 
             # ── Doctor PDF ────────────────────────────────────────────────────
             st.markdown("#### Doctor Handoff Report")
