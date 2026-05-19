@@ -26,80 +26,65 @@ with tab_predict:
 
     # ── Core health inputs ────────────────────────────────────────────────────
     st.subheader("Your Health Data")
-    col1, col2, col3 = st.columns(3)
 
-    def slider_input(label, min_val, max_val, default, key, step=1, fmt="%d"):
-        """Render a slider and a number input that stay in sync."""
-        s_col, n_col = st.columns([3, 1])
-        with s_col:
-            slider_val = st.slider(label, min_val, max_val, default,
-                                   step=step, key=f"{key}_slider",
-                                   label_visibility="visible")
-        with n_col:
-            st.write("")  # vertical align
-            num_val = st.number_input(
-                "value", min_value=float(min_val), max_value=float(max_val),
-                value=float(slider_val), step=float(step),
-                key=f"{key}_num", label_visibility="collapsed"
-            )
-        # Number input wins if different from slider (user typed)
-        return int(num_val) if step == 1 else round(float(num_val), 1)
+    age       = st.slider("Age", 20, 80, 45)
+    sex_label = st.selectbox("Sex", ["Female", "Male"])
+    sex       = 1 if sex_label == "Male" else 0
+    cp        = st.selectbox("Chest Pain Type",
+                              [0, 1, 2, 3],
+                              format_func=lambda x: {
+                                  0: "0 – Typical Angina",
+                                  1: "1 – Atypical Angina",
+                                  2: "2 – Non-Anginal Pain",
+                                  3: "3 – Asymptomatic"}[x])
+    trestbps  = st.slider("Resting Blood Pressure (mmHg)", 80, 200, 120)
+    chol      = st.slider("Cholesterol (mg/dl)", 100, 400, 200)
+    fbs_label = st.selectbox("Fasting Blood Sugar > 120 mg/dl", ["No", "Yes"])
+    fbs       = 1 if fbs_label == "Yes" else 0
+    restecg   = st.selectbox("Resting ECG",
+                              [0, 1, 2],
+                              format_func=lambda x: {
+                                  0: "0 – Normal",
+                                  1: "1 – ST-T Abnormality",
+                                  2: "2 – Left Ventricular Hypertrophy"}[x])
+    thalach   = st.slider("Max Heart Rate Achieved", 60, 200, 150)
+    exang_label = st.selectbox("Exercise-Induced Angina", ["No", "Yes"])
+    exang     = 1 if exang_label == "Yes" else 0
+    oldpeak   = st.slider("ST Depression (Oldpeak)", 0.0, 5.0, 1.0, step=0.1)
+    slope     = st.selectbox("ST Slope",
+                              [0, 1, 2],
+                              format_func=lambda x: {
+                                  0: "0 – Upsloping",
+                                  1: "1 – Flat",
+                                  2: "2 – Downsloping"}[x])
+    ca        = st.selectbox("Blocked Vessels (CA)",
+                              [0, 1, 2, 3],
+                              format_func=lambda x: f"{x} vessel{'s' if x != 1 else ''}")
+    thal      = st.selectbox("Thalassemia (Thal)",
+                              [0, 1, 2, 3],
+                              format_func=lambda x: {
+                                  0: "0 – Normal",
+                                  1: "1 – Fixed Defect",
+                                  2: "2 – Reversible Defect",
+                                  3: "3 – Unknown"}[x])
 
-    with col1:
-        age        = slider_input("Age", 20, 80, 45, "age")
-        sex_label  = st.selectbox("Sex", ["Female", "Male"])
-        sex        = 1 if sex_label == "Male" else 0
-        cp         = st.selectbox("Chest Pain Type",
-                                  [0, 1, 2, 3],
-                                  format_func=lambda x: {
-                                      0: "0 – Typical Angina",
-                                      1: "1 – Atypical Angina",
-                                      2: "2 – Non-Anginal Pain",
-                                      3: "3 – Asymptomatic"}[x])
-        trestbps   = slider_input("Resting Blood Pressure (mmHg)", 80, 200, 120, "trestbps")
-        chol       = slider_input("Cholesterol (mg/dl)", 100, 400, 200, "chol")
-
-    with col2:
-        fbs_label  = st.selectbox("Fasting Blood Sugar > 120 mg/dl", ["No", "Yes"])
-        fbs        = 1 if fbs_label == "Yes" else 0
-        restecg    = st.selectbox("Resting ECG",
-                                  [0, 1, 2],
-                                  format_func=lambda x: {
-                                      0: "0 – Normal",
-                                      1: "1 – ST-T Abnormality",
-                                      2: "2 – Left Ventricular Hypertrophy"}[x])
-        thalach    = slider_input("Max Heart Rate Achieved", 60, 200, 150, "thalach")
-        exang_label = st.selectbox("Exercise-Induced Angina", ["No", "Yes"])
-        exang      = 1 if exang_label == "Yes" else 0
-
-    with col3:
-        oldpeak    = slider_input("ST Depression (Oldpeak)", 0.0, 5.0, 1.0, "oldpeak", step=0.1)
-        slope      = st.selectbox("ST Slope",
-                                  [0, 1, 2],
-                                  format_func=lambda x: {
-                                      0: "0 – Upsloping",
-                                      1: "1 – Flat",
-                                      2: "2 – Downsloping"}[x])
-        ca         = st.selectbox("Blocked Vessels (CA)",
-                                  [0, 1, 2, 3],
-                                  format_func=lambda x: f"{x} vessel{'s' if x != 1 else ''}")
-        thal       = st.selectbox("Thalassemia (Thal)",
-                                  [0, 1, 2, 3],
-                                  format_func=lambda x: {
-                                      0: "0 – Normal",
-                                      1: "1 – Fixed Defect",
-                                      2: "2 – Reversible Defect",
-                                      3: "3 – Unknown"}[x])
+    # ── Manual entry (advanced) ───────────────────────────────────────────────
+    with st.expander("✏️ Prefer to type values manually?"):
+        st.caption("These override the sliders above if changed.")
+        m1, m2 = st.columns(2)
+        with m1:
+            age      = st.number_input("Age", 20, 80, age, key="m_age")
+            trestbps = st.number_input("Blood Pressure", 80, 200, trestbps, key="m_bp")
+            chol     = st.number_input("Cholesterol", 100, 400, chol, key="m_chol")
+            thalach  = st.number_input("Max Heart Rate", 60, 200, thalach, key="m_hr")
+        with m2:
+            oldpeak  = st.number_input("ST Depression", 0.0, 5.0, float(oldpeak), step=0.1, key="m_op")
 
     # ── Wearable data (optional) ──────────────────────────────────────────────
     with st.expander("⌚ Wearable Data (Optional)"):
-        w_col1, w_col2, w_col3 = st.columns(3)
-        with w_col1:
-            resting_hr  = slider_input("Resting Heart Rate (bpm)", 40, 120, 70, "rhr")
-        with w_col2:
-            sleep_hrs   = slider_input("Avg Sleep (hours/night)", 3, 12, 7, "sleep")
-        with w_col3:
-            daily_steps = slider_input("Daily Steps", 0, 20000, 7000, "steps", step=100)
+        resting_hr  = st.slider("Resting Heart Rate (bpm)", 40, 120, 70)
+        sleep_hrs   = st.slider("Avg Sleep (hours/night)", 3, 12, 7)
+        daily_steps = st.slider("Daily Steps", 0, 20000, 7000, step=100)
 
         wearable_summary = f"Resting HR: {resting_hr} bpm, Sleep: {sleep_hrs} hrs/night, Daily steps: {daily_steps}"
 
@@ -213,38 +198,43 @@ with tab_predict:
         st.caption("This is not medical advice. Please consult a doctor.")
 
         # ── SHAP explanation chart ────────────────────────────────────────────
-        st.subheader("Why this score? — Top Contributing Factors")
+        st.subheader("Top Contributing Factors")
 
-        features = [d["feature"] for d in shap_result]
-        values   = [d["value"]   for d in shap_result]
+        top_shap = shap_result[:7]  # only top 7
+        features = [d["feature"] for d in top_shap]
+        values   = [d["value"]   for d in top_shap]
         colors   = ["#e74c3c" if v > 0 else "#2ecc71" for v in values]
 
-        fig, ax = plt.subplots(figsize=(8, 5))
-        bars = ax.barh(features[::-1], values[::-1], color=colors[::-1])
-        ax.axvline(0, color="gray", linewidth=0.8, linestyle="--")
-        ax.set_xlabel("SHAP Value (impact on risk score)")
-        ax.set_title("Feature Contribution to Your Risk Score")
+        fig, ax = plt.subplots(figsize=(6, 3.5))
+        fig.patch.set_facecolor("#f0f8ff")
+        ax.set_facecolor("#f0f8ff")
 
-        # Add value labels on bars
-        for bar, val in zip(bars, values[::-1]):
-            ax.text(
-                bar.get_width() + (0.002 if val >= 0 else -0.002),
-                bar.get_y() + bar.get_height() / 2,
-                f"{val:+.3f}",
-                va="center",
-                ha="left" if val >= 0 else "right",
-                fontsize=8
-            )
+        y_pos = range(len(features))
 
-        ax.legend(
-            handles=[
-                plt.Rectangle((0,0),1,1, color="#e74c3c", label="Increases risk"),
-                plt.Rectangle((0,0),1,1, color="#2ecc71", label="Reduces risk"),
-            ],
-            loc="lower right", fontsize=8
-        )
+        # Horizontal lines from 0 to value (lollipop stems)
+        for i, (val, col) in enumerate(zip(values, colors)):
+            ax.plot([0, val], [i, i], color=col, linewidth=2, alpha=0.8)
+            ax.scatter(val, i, color=col, s=80, zorder=5)
+            # Place label above the dot to avoid overlap with y-axis labels
+            ax.text(val, i + 0.3,
+                    f"{val:+.3f}",
+                    va="bottom",
+                    ha="center",
+                    fontsize=7.5, color="#1a2e3b")
+
+        ax.axvline(0, color="#aaaaaa", linewidth=0.8, linestyle="--")
+        ax.set_yticks(list(y_pos))
+        ax.set_yticklabels(features, fontsize=9, color="#1a2e3b")
+        ax.set_xlabel("SHAP Value", fontsize=9, color="#1a2e3b")
+        ax.tick_params(axis="x", labelsize=8, colors="#1a2e3b")
+        ax.spines[["top", "right", "left"]].set_visible(False)
+        ax.spines["bottom"].set_color("#cccccc")
+        ax.set_title("What influenced your score?", fontsize=11,
+                     color="#1a2e3b", pad=10, fontweight="bold")
+
         fig.tight_layout()
         st.pyplot(fig)
+        plt.close(fig)
 
 
 
@@ -369,10 +359,23 @@ with tab_history:
 
         # Clear history
         st.divider()
+        if "confirm_clear" not in st.session_state:
+            st.session_state.confirm_clear = False
+
         if st.button("🗑️ Clear History"):
-            confirm = st.checkbox("Yes, I want to permanently delete my history")
-            if confirm:
-                os.remove(HISTORY_FILE)
-                st.success("History cleared.")
-                st.rerun()
-                
+            st.session_state.confirm_clear = True
+
+        if st.session_state.confirm_clear:
+            st.warning("Are you sure? This cannot be undone.")
+            col_yes, col_no = st.columns(2)
+            with col_yes:
+                if st.button("✅ Yes, delete", key="confirm_yes"):
+                    os.remove(HISTORY_FILE)
+                    st.session_state.confirm_clear = False
+                    st.success("History cleared.")
+                    st.rerun()
+            with col_no:
+                if st.button("❌ Cancel", key="confirm_no"):
+                    st.session_state.confirm_clear = False
+                    st.rerun()
+                    
