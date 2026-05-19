@@ -1,4 +1,5 @@
 # MedWise AI 🩺
+**Live Demo:** [medwise-ai.streamlit.app](https://medwise-ai.streamlit.app)
 
 An AI-powered heart disease risk prediction app built with Python and Streamlit.
 
