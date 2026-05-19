@@ -28,8 +28,25 @@ with tab_predict:
     st.subheader("Your Health Data")
     col1, col2, col3 = st.columns(3)
 
+    def slider_input(label, min_val, max_val, default, key, step=1, fmt="%d"):
+        """Render a slider and a number input that stay in sync."""
+        s_col, n_col = st.columns([3, 1])
+        with s_col:
+            slider_val = st.slider(label, min_val, max_val, default,
+                                   step=step, key=f"{key}_slider",
+                                   label_visibility="visible")
+        with n_col:
+            st.write("")  # vertical align
+            num_val = st.number_input(
+                "value", min_value=float(min_val), max_value=float(max_val),
+                value=float(slider_val), step=float(step),
+                key=f"{key}_num", label_visibility="collapsed"
+            )
+        # Number input wins if different from slider (user typed)
+        return int(num_val) if step == 1 else round(float(num_val), 1)
+
     with col1:
-        age        = st.slider("Age", 20, 80, 45)
+        age        = slider_input("Age", 20, 80, 45, "age")
         sex_label  = st.selectbox("Sex", ["Female", "Male"])
         sex        = 1 if sex_label == "Male" else 0
         cp         = st.selectbox("Chest Pain Type",
@@ -39,8 +56,8 @@ with tab_predict:
                                       1: "1 – Atypical Angina",
                                       2: "2 – Non-Anginal Pain",
                                       3: "3 – Asymptomatic"}[x])
-        trestbps   = st.slider("Resting Blood Pressure (mmHg)", 80, 200, 120)
-        chol       = st.slider("Cholesterol (mg/dl)", 100, 400, 200)
+        trestbps   = slider_input("Resting Blood Pressure (mmHg)", 80, 200, 120, "trestbps")
+        chol       = slider_input("Cholesterol (mg/dl)", 100, 400, 200, "chol")
 
     with col2:
         fbs_label  = st.selectbox("Fasting Blood Sugar > 120 mg/dl", ["No", "Yes"])
@@ -51,12 +68,12 @@ with tab_predict:
                                       0: "0 – Normal",
                                       1: "1 – ST-T Abnormality",
                                       2: "2 – Left Ventricular Hypertrophy"}[x])
-        thalach    = st.slider("Max Heart Rate Achieved", 60, 200, 150)
+        thalach    = slider_input("Max Heart Rate Achieved", 60, 200, 150, "thalach")
         exang_label = st.selectbox("Exercise-Induced Angina", ["No", "Yes"])
         exang      = 1 if exang_label == "Yes" else 0
 
     with col3:
-        oldpeak    = st.slider("ST Depression (Oldpeak)", 0.0, 5.0, 1.0)
+        oldpeak    = slider_input("ST Depression (Oldpeak)", 0.0, 5.0, 1.0, "oldpeak", step=0.1)
         slope      = st.selectbox("ST Slope",
                                   [0, 1, 2],
                                   format_func=lambda x: {
@@ -78,11 +95,11 @@ with tab_predict:
     with st.expander("⌚ Wearable Data (Optional)"):
         w_col1, w_col2, w_col3 = st.columns(3)
         with w_col1:
-            resting_hr = st.slider("Resting Heart Rate (bpm)", 40, 120, 70)
+            resting_hr  = slider_input("Resting Heart Rate (bpm)", 40, 120, 70, "rhr")
         with w_col2:
-            sleep_hrs  = st.slider("Avg Sleep (hours/night)", 3, 12, 7)
+            sleep_hrs   = slider_input("Avg Sleep (hours/night)", 3, 12, 7, "sleep")
         with w_col3:
-            daily_steps = st.slider("Daily Steps", 0, 20000, 7000)
+            daily_steps = slider_input("Daily Steps", 0, 20000, 7000, "steps", step=100)
 
         wearable_summary = f"Resting HR: {resting_hr} bpm, Sleep: {sleep_hrs} hrs/night, Daily steps: {daily_steps}"
 
