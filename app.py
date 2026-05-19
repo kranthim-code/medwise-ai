@@ -7,6 +7,7 @@ from predict import predict_risk, explain_risk
 from pypdf import PdfReader
 from openai import OpenAI
 from lab_parser import extract_lab_values, summarize_for_ai
+from report_generator import build_doctor_report
 
 st.set_page_config(page_title="MedWise AI", page_icon="🩺", layout="wide")
 st.title("MedWise AI 🩺")
@@ -129,6 +130,7 @@ with tab_predict:
 
             if lab_results:
                 lab_df = pd.DataFrame(lab_results)
+                st.session_state["lab_results"] = lab_results
 
                 def color_status(val):
                     if "🔴" in str(val): return "background-color: #fde8e8"
@@ -227,27 +229,63 @@ with tab_predict:
         fig.tight_layout()
         st.pyplot(fig)
 
-        # ── Personalized recommendations ──────────────────────────────────────
-        st.subheader("Personalized Recommendations")
+        # ── AI Personalized Recommendations ───────────────────────────────────
+        st.subheader("🤖 Personalized Recommendations")
 
-        recs = []
-        if chol > 240:      recs.append("🔴 Cholesterol is high — consider dietary changes and speak to your doctor")
-        if trestbps > 130:  recs.append("🔴 Blood pressure is elevated — reduce sodium and monitor regularly")
-        if age > 50:        recs.append("🟡 Age is a risk factor — regular cardiac check-ups are important")
-        if resting_hr > 100: recs.append("🟡 Resting heart rate is high — limit caffeine and manage stress")
-        if sleep_hrs < 6:   recs.append("🟡 Poor sleep affects heart health — aim for 7–9 hours")
-        if daily_steps < 5000: recs.append("🟡 Low activity level — aim for 8,000–10,000 steps daily")
+        with st.spinner("Generating personalized recommendations..."):
+            top_factors = ", ".join(
+                f"{d['feature']} ({d['direction']})"
+                for d in shap_result[:5]
+            )
+            wearable_context = (
+                f"Resting HR: {resting_hr} bpm, "
+                f"Sleep: {sleep_hrs} hrs/night, "
+                f"Daily steps: {daily_steps}"
+            )
 
-        if not recs:
-            st.success("Your metrics look good! Keep up the healthy habits.")
-        else:
-            for rec in recs:
-                st.write(rec)
+            ai_client = OpenAI()
+            ai_response = ai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{
+                    "role": "user",
+                    "content": (
+                        "You are a compassionate health assistant. Based on this patient's data, "
+                        "write 5-7 specific, actionable, personalized health recommendations. "
+                        "Be warm, clear, and encouraging. Do NOT diagnose. "
+                        "End with a reminder to consult their doctor.\n\n"
+                        f"Risk Level: {result['risk']} ({result['probability']}% probability)\n"
+                        f"Age: {age}, Sex: {sex_label}\n"
+                        f"Cholesterol: {chol} mg/dL, Blood Pressure: {trestbps} mmHg\n"
+                        f"Top risk factors from AI model: {top_factors}\n"
+                        f"Wearable data: {wearable_context}\n"
+                    )
+                }]
+            )
+            ai_recommendations = ai_response.choices[0].message.content
 
-        st.write("**Suggested next steps:**")
-        st.write("- Talk to a cardiologist if risk is high")
-        st.write("- Track blood pressure weekly")
-        st.write("- Improve diet and exercise habits")
+        st.write(ai_recommendations)
+
+        # ── Doctor Handoff PDF ─────────────────────────────────────────────────
+        st.subheader("📄 Doctor Handoff Report")
+        st.write("Download a PDF summary to share with your doctor.")
+
+        lab_results_for_report = st.session_state.get("lab_results", None)
+
+        pdf_bytes = build_doctor_report(
+            patient_data=user_data,
+            risk_result=result,
+            shap_result=shap_result,
+            ai_recommendations=ai_recommendations,
+            lab_results=lab_results_for_report,
+        )
+
+        st.download_button(
+            label="⬇️ Download Doctor Report (PDF)",
+            data=pdf_bytes,
+            file_name=f"medwise_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
 
         # ── Save to history ───────────────────────────────────────────────────
         new_row = pd.DataFrame([{
