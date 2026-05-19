@@ -243,32 +243,32 @@ with tab_predict:
 
         recs = []
         if chol > 240:
-            recs.append("🔴 Your cholesterol is high — reduce saturated fats, increase fiber, and ask your doctor about medication options.")
+            recs.append("• Your cholesterol is high — reduce saturated fats, increase fiber, and ask your doctor about medication options.")
         elif chol > 200:
-            recs.append("🟡 Your cholesterol is borderline — consider dietary changes like cutting fried foods and increasing vegetables.")
+            recs.append("• Your cholesterol is borderline — consider dietary changes like cutting fried foods and increasing vegetables.")
         if trestbps > 140:
-            recs.append("🔴 Your blood pressure is high — reduce sodium intake, limit alcohol, and monitor it weekly.")
+            recs.append("• Your blood pressure is high — reduce sodium intake, limit alcohol, and monitor it weekly.")
         elif trestbps > 120:
-            recs.append("🟡 Your blood pressure is elevated — try reducing stress and cutting back on salty foods.")
+            recs.append("• Your blood pressure is elevated — try reducing stress and cutting back on salty foods.")
         if resting_hr > 100:
-            recs.append("🔴 Your resting heart rate is high — limit caffeine, manage stress, and discuss with your doctor.")
+            recs.append("• Your resting heart rate is high — limit caffeine, manage stress, and discuss with your doctor.")
         if sleep_hrs < 6:
-            recs.append("🟡 You're getting less than 6 hours of sleep — aim for 7–9 hours as poor sleep increases heart risk.")
+            recs.append("• You're getting less than 6 hours of sleep — aim for 7-9 hours as poor sleep increases heart risk.")
         if daily_steps < 5000:
-            recs.append("🟡 Your daily activity is low — try to reach 8,000–10,000 steps per day with short walks.")
+            recs.append("• Your daily activity is low — try to reach 8,000-10,000 steps per day with short walks.")
         if age > 50:
-            recs.append("🟡 Age is a risk factor — schedule regular cardiac check-ups at least once a year.")
+            recs.append("• Age is a risk factor — schedule regular cardiac check-ups at least once a year.")
         if result["risk"] == "High Risk":
-            recs.append("🔴 Your overall risk is high — please consult a cardiologist soon.")
+            recs.append("• Your overall risk is high — please consult a cardiologist soon.")
 
         # Always add top SHAP factor insight
         top = shap_result[0]
-        recs.append(f"🔵 The biggest factor in your score is **{top['feature']}** — speak to your doctor about this specifically.")
+        recs.append(f"• The biggest factor in your score is {top['feature']} — speak to your doctor about this specifically.")
 
         if not recs:
-            recs.append("✅ Your metrics look good overall — keep up the healthy habits and get regular check-ups.")
+            recs.append("• Your metrics look good overall — keep up the healthy habits and get regular check-ups.")
 
-        recs.append("👨‍⚕️ This is not medical advice. Always consult a qualified healthcare professional before making any health decisions.")
+        recs.append("• This is not medical advice. Always consult a qualified healthcare professional before making any health decisions.")
 
         ai_recommendations = "\n".join(recs)
         for rec in recs:
